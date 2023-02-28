@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Moves away chroot directories
+# Spoiler: This script does not delete anything for avoiding strange effects
+# with mounted /proc, /dev or other directories. Instead the existing chroot
+# will be renamed to $CHROOT/dir_XXXX. It is recommended to delete these copies
+# only after the next reboot.
+# Usage:
+# ./delete-chroot /path/to/chroot unstable
+
+set -e
+
+RELEASE="${2:-sid}"
+CHROOT="${1:-/srv/chroot/$RELEASE}"
+
+echo "Removing $CHROOT..."
+sleep 2
+
+if [ ! -d "$CHROOT" ] || [ -z "$CHROOT" ]
+then
+	echo "Chroot not existing"
+	exit 1
+else
+	CHROOT=$(realpath -s "$CHROOT")
+	for MP in proc sys dev/pts
+	do
+		mount | grep -q "${CHROOT}/${MP}" && sudo umount "${CHROOT}/$MP"
+	done
+
+	BAK=$(mktemp -u -d "${CHROOT}_XXXX")
+	echo "Moving $CHROOT to $BAK"
+	sudo mv "$CHROOT" "$BAK"
+
+	if [ -d "${BAK}/dev" ]
+	then
+		sudo umount "${BAK}/dev"
+	fi
+
+	echo "$CHROOT moved to $BAK"
+	echo "DON'T DELETE before reboot !!!!"
+fi
