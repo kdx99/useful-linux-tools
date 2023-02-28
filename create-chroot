@@ -121,7 +121,7 @@ sed -i 's|^.*/etc/profile.d/safe-rm.sh$||' "$CHROOT_HOME/.bashrc"
 sed -i 's|^.*register-python-argcomplete3.*$||' "$CHROOT_HOME/.bashrc"
 sed -i 's|^.*xset.*$||' "$CHROOT_HOME/.bashrc"
 
-sudo grep -q BUILD "${CHROOT}/root/.bashrc" || echo "export BUILD=/home/${USER_NAME}/build" | sudo tee -a "${CHROOT}/root/.bashrc"
+sudo grep -q BUILD "${CHROOT}/root/.bashrc" || echo "export BUILD=/home/${USER_NAME}/build" | sudo tee -a "${CHROOT}/${USER_NAME}/.bashrc"
 
 for HOOK in $(find "/home/${USER_NAME}/.config/chroot/hooks.d" -maxdepth 1 -type f )
 do
