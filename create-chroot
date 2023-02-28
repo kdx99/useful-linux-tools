@@ -1,0 +1,131 @@
+#!/bin/sh
+
+# Create chroot environment for Debian sid, add user and (on demand) some
+# scripts/config/additional files
+# TODO: mirror and timezone must be set within the script variables
+# (should better be given as parameters).
+# Usage:
+# (sudo) ./create-chroot
+
+set -e
+
+CHROOT="/srv/chroot/${1:-sid}"
+RELEASE="${2:-sid}"
+USER_NAME=$(whoami)
+if [ "$USER_NAME" = "root" ]
+then
+	USER_NAME=$(logname)
+fi
+# set mirror and timezone according to your needs
+MIRROR="debian.ethz.ch"
+TIMEZONE="Europe/Zurich"
+ARCHITECTURE="${3:-$(dpkg --print-architecture)}"
+
+if [ -z "$ARCHITECTURE" ]
+then
+	ARCHITECTURE="$(uname -r | awk -F- '{ print $NF }')"
+	ARCHITECTURE="${ARCHITECTURE:-amd64}"
+fi
+
+echo "Creating chroot for $ARCHITECTURE $RELEASE in $CHROOT ..."
+sleep 1
+
+COPY_FILES="/home/${USER_NAME}/.config/chroot/files-to-copy"
+
+mkdir -p "/home/${USER_NAME}/.config/chroot/hooks.d"
+
+if [ ! -e "$COPY_FILES" ]
+then
+	echo "# add absolute paths of files you want to copy into chroot line-wise" > "$COPY_FILES"
+fi
+
+chown -R "${USER_NAME}:${USER_NAME}" "/home/${USER_NAME}/.config/chroot"
+
+if [ ! -d "$CHROOT" ]
+then
+	if [ -e /usr/bin/mmdebstrap ]
+	then
+		sudo mmdebstrap --mode=root --arch="$ARCHITECTURE" --components=main,contrib,non-free "$RELEASE" "$CHROOT" http://${MIRROR}/debian
+	elif [ -e /sbin/debootstrap ]
+	then
+		sudo debootstrap --arch=${ARCHITECTURE} ${RELEASE} "${CHROOT}" http://${MIRROR}/debian
+	else
+		echo "Neither mmdebstrap nor debootstrap installed - exiting."
+		exit 1
+	fi
+
+	sudo mount -t proc /proc "${CHROOT}/proc"
+	sudo mount -o bind /sys "${CHROOT}/sys"
+	sudo mount -o bind /dev  "${CHROOT}/dev"
+	sudo mount -t devpts /dev/pts "${CHROOT}/dev/pts"
+	echo "$TIMEZONE" | sudo tee "${CHROOT}/etc/timezone"
+	sudo chroot "$CHROOT" apt update
+	if ! grep ^"$USER_NAME" /srv/chroot/sid/etc/passwd >/dev/null
+	then
+		echo "Adding user $USER_NAME..."
+		sudo chroot "$CHROOT" useradd -m -s /bin/bash "$USER_NAME"
+	fi
+	sudo chroot "$CHROOT" apt install -y locales dpkg-dev devscripts quilt
+fi
+
+echo 'export LANG="C.UTF-8"' | sudo tee "$CHROOT/etc/profile.d/chroot-lang"
+echo 'export LC_ALL="C.UTF-8"' | sudo tee -a "$CHROOT/etc/profile.d/chroot-lang"
+
+CHROOT_HOME="${CHROOT}/home/${USER_NAME}"
+
+if [ ! -d "$CHROOT_HOME" ]
+then
+	sudo mkdir "$CHROOT_HOME"
+	sudo chown "${USER_NAME}":"${USER_NAME}" "$CHROOT_HOME"
+fi
+
+mkdir -p "${CHROOT_HOME}/build"
+chown "${USER_NAME}:${USER_NAME}" "${CHROOT_HOME}/build"
+
+for F in .bashrc .profile .ssh .gnupg
+do
+	if [ -e "/home/${USER_NAME}/$F" ]
+	then
+		rsync -av --numeric-ids "/home/${USER_NAME}/$F" "$CHROOT_HOME"
+	fi
+done
+
+FILES=$(grep -sEv '^#|^$' "$COPY_FILES")
+
+if [ -n "$FILES" ]
+then
+	for FILE in $FILES
+	do
+		if [ -e "$FILE" ]
+		then
+			DIRNAME=$(dirname "$FILE")
+			sudo mkdir -p "${CHROOT}/${DIRNAME}"
+			sudo cp -r "$FILE" "${CHROOT}${FILE}"
+		else
+			echo "Can't copy $FILE - not existing."
+		fi
+	done
+fi
+
+# Copy some special config if existing
+if [ -d "/home/${USER_NAME}/.config/chroot/etc/" ]
+then
+	for CFG in /home/"${USER_NAME}"/.config/chroot/etc/*
+	do
+		sudo cp -r "$CFG" "$CHROOT/etc"
+	done
+fi
+
+# some specials which might exist in your home but not in the chroot
+sed -i 's|^.*/etc/profile.d/safe-rm.sh$||' "$CHROOT_HOME/.bashrc"
+sed -i 's|^.*register-python-argcomplete3.*$||' "$CHROOT_HOME/.bashrc"
+sed -i 's|^.*xset.*$||' "$CHROOT_HOME/.bashrc"
+
+sudo grep -q BUILD "${CHROOT}/root/.bashrc" || echo "export BUILD=/home/${USER_NAME}/build" | sudo tee -a "${CHROOT}/root/.bashrc"
+
+for HOOK in $(find "/home/${USER_NAME}/.config/chroot/hooks.d" -maxdepth 1 -type f )
+do
+	"$HOOK"
+done
+
+echo "Finished. Chroot to $CHROOT"
