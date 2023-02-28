@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Find out the user who calls the script no matter if called as sudo or not.
+
+set -e
+
+USER_NAME=$(whoami)
+if [ "$USER_NAME" = "root" ]
+then
+	USER_NAME=$(logname)
+fi
+echo $USER_NAME
