@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Test your audio+microphone device by hearing what you are saying
+
+FORMAT="${1:-cd}"
+
+# -f cd (16 bit little endian, 44100, stereo) [-f S16_LE -c2 -r44100]
+# -f cdr (16 bit big endian, 44100, stereo) [-f S16_BE -c2 -r44100]
+# -f dat (16 bit little endian, 48000, stereo) [-f S16_LE -c2 -r48000]
+
+arecord -f $FORMAT | aplay -vvv
