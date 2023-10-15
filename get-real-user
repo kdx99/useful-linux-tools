@@ -4,9 +4,16 @@
 
 set -e
 
-USER_NAME=$(whoami)
-if [ "$USER_NAME" = "root" ]
+USER_NAME="$SUDO_USER"
+
+if [ -n "$SUDO_USER" ]
 then
-	USER_NAME=$(logname)
+	echo "$USER_NAME"
+else
+	USER_NAME=$(whoami)
+	if [ "$USER_NAME" = "root" ]
+	then
+		USER_NAME=$(logname)
+	fi
+	echo $USER_NAME
 fi
-echo $USER_NAME
