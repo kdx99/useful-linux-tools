@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# Debian or RedHat - that is the question
+PM=$(command -v rpm)
+if [ -z "$PM" ]
+then
+	PM=$(command -v dpkg)
+fi
+
+case "$PM" in
+	*rpm)
+		KERNEL_SOLL=$(rpm -qa | grep -e "^kernel-[[:digit:]]" | sed -e 's|kernel-||' | sort | tail -n 1)
+	;;
+	*dpkg)
+		KERNEL_SOLL=$(dpkg -l | awk '/^ii/ { print $2 }' | grep ^linux-image-[[:digit:]] | sed -e 's|linux-image-||' | sort | tail -n 1)
+	;;
+	*)
+		echo "Package manager neither rpm nor dpkg - stopping here."
+		exit 3
+	;;
+esac
+
+KERNEL_IST=$(uname -r)
+
+if [ -z "$KERNEL_SOLL" ] || [ -z "$KERNEL_IST" ]
+then
+	echo "No kernel? Strange things happening... try uname -a and compare."
+	exit 2
+fi
+
+if [ "$KERNEL_SOLL" != "$KERNEL_IST" ]
+then
+	echo "Actual kernel version does not fit installed kernel version. Consider rebooting"
+	exit 1
+else
+	echo "OK - Booted kernel is latest installed (${KERNEL_IST})."
+	exit 0
+fi
+
