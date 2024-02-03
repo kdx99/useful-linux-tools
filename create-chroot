@@ -55,7 +55,7 @@ then
 	fi
 
 	sudo mount -t proc /proc "${CHROOT}/proc"
-	sudo mount -o bind /sys "${CHROOT}/sys"
+	sudo mount -t sysfs /sys "${CHROOT}/sys"
 	sudo mount -o bind /dev  "${CHROOT}/dev"
 	sudo mount -t devpts /dev/pts "${CHROOT}/dev/pts"
 	echo "$TIMEZONE" | sudo tee "${CHROOT}/etc/timezone"
