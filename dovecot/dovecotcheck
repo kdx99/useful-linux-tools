@@ -4,13 +4,15 @@
 # -> Neustart hilft
 
 TS=$(date +%Y-%m-%dT%T.%6N%:z)
-DATE=$(date +%FT%T)
+#DATE=$(date +%FT%T)
+DATE=$(date +%F)
 HOST=$(hostname)
 
 FAIL=$(grep -i "sslv3 alert certificate unknown" /var/log/mail.log | grep "$DATE")
+RESTART=$(grep "Restarting dovecot because of certificate error" /var/log/mail.log | grep "$DATE")
 
-if [ -n "$FAIL" ]
+if [ -n "$FAIL" ] && [ -z "$RESTART" ]
 then
 	echo "$TS $HOST dovecot: Restarting dovecot because of certificate error" >> /var/log/mail.log
-	service dovecot restart >/dev/null
+	/usr/sbin/service dovecot restart >/dev/null
 fi
