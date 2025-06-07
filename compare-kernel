@@ -9,10 +9,11 @@ fi
 
 case "$PM" in
 	*rpm)
-		KERNEL_SOLL=$(rpm -qa | grep -e "^kernel-[[:digit:]]" | sed -e 's|kernel-||' | sort | tail -n 1)
+		KERNEL_SOLL=$(rpm -qa | grep -e "^kernel-[[:digit:]]" | sed -e 's|kernel-||' | sort --sort=version | tail -n 1)
 	;;
 	*dpkg)
-		KERNEL_SOLL=$(dpkg -l | awk '/^ii/ { print $2 }' | grep ^linux-image-[[:digit:]] | sed -e 's|linux-image-||' | sort | tail -n 1)
+		KERNEL_SOLL=$(dpkg -l | awk '/^ii/ { print $2 }' | grep ^linux-image-[[:digit:]] | sed -e 's|linux-image-||' \
+		  | sort --sort=version | tail -n 1)
 	;;
 	*)
 		echo "Package manager neither rpm nor dpkg - stopping here."
